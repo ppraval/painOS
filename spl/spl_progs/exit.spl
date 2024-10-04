@@ -1,0 +1,18 @@
+// Set mode flag to system call number - 10 for exit
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 10;
+
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1; 
+
+R10 = "---------";
+print R10;
+print "Exiting";
+print R10;
+
+R1 = 3; // exit process function
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call PROCESS_MANAGER;
+call SCHEDULER;

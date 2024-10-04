@@ -1,0 +1,8 @@
+alias num R0;
+num = 20;
+print num;
+breakpoint;
+num = num * (num + 1) * (2 * num + 1);
+breakpoint;
+num = num / 6;
+print num;

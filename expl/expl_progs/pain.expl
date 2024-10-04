@@ -1,0 +1,12 @@
+int main()
+{
+        decl
+                str s;
+                int temp;
+        enddecl
+        begin
+          	s = "-pain-";
+                temp = exposcall("Write", -2, s);
+                return 0;
+        end
+}

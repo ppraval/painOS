@@ -1,0 +1,8 @@
+alias i R0;
+alias val R1;
+i = 1;
+while(i <= 20) do
+	val = val * i;
+	print val;
+	i = i + 1;
+endwhile;

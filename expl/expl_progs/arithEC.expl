@@ -1,0 +1,10 @@
+int main() {
+    decl
+        int temp, n;
+    enddecl
+    begin
+        n = 0;
+        n = n / 0;
+        return 0;
+    end
+}

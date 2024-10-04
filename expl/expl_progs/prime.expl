@@ -1,0 +1,24 @@
+int main () {
+    decl
+        int temp, i, j, flag;
+    enddecl
+    begin
+        i = 2;
+        while (i <= 97) do
+            flag = 1;
+            j = 2;
+            while (j <= (i / 2)) do
+                if ((i % j) == 0) then
+                    flag = 0;
+                    break;
+                endif;
+                j = j + 1;
+            endwhile;
+            if (flag == 1) then
+                temp = exposcall("Write", -2, i);
+            endif;
+            i = i + 1;
+        endwhile;
+        return 0;
+    end
+}

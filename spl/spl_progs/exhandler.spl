@@ -1,0 +1,86 @@
+breakpoint;
+//setting modeflag to -1 for execption handler
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = -1;
+
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+backup;
+
+multipush(EIP);
+
+//if execption cause is not a page fault or the user stack is full
+if ((EC != 0) || ([PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] == (PTLR * 512 - 1))) then
+    if (EC == 0) then
+        print "Stack overflow";
+    endif;
+    if (EC == 1) then
+        print "Illegal instruction";
+    endif;
+    if (EC == 2) then
+        print "Illegal memory access";
+    endif;
+    if (EC == 3) then
+        print "Arithmetic Exception";
+    endif;
+
+    multipush(R0);
+    //calling exit_process() from process manager
+    R1 = 3;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    call MOD_1;
+    //calling scheduler
+    call MOD_5;
+
+    multipop(R0);
+else
+    alias blockNumber R2;
+    if (EPN > 3 && EPN < 8) then // code page
+        blockNumber = [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE + 1] * 10 + EPN];
+
+        multipush(R0, R1, R2);
+        multipush(EPN);
+        R1 = 5;
+        R2 = blockNumber;
+        call MOD_2;
+
+        multipop(EPN);
+        [PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1] * 20 + 2 * EPN] = R0;
+        [PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE + 1] * 20 + 2 * EPN + 1] = "1100";
+
+        multipop(R0, R1, R2);
+    else
+        // Heap page
+        multipush(R0, R1, R2);
+
+        R1 = 1;
+        call MOD_2;
+        [PTBR + 4] = R0;
+        [PTBR + 5] = "1110";
+
+        R1 = 1;
+        call MOD_2;
+        [PTBR + 6] = R0;
+        [PTBR + 7] = "1110";
+
+        multipop(R0, R1, R2);
+    endif;
+endif;
+
+//setting modeflag back to zero
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+multipop(EIP);
+
+restore;
+//setting sp to user stack sp
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];
+
+//incrementing sp and store EIP to top of SP to retry
+SP = SP + 1;
+[[PTBR + 2 * (SP / 512)] * 512 + (SP % 512)] = EIP;
+
+ireturn;

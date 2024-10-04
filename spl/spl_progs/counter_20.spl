@@ -1,0 +1,6 @@
+alias pain R0;
+pain = 0;
+while(pain <= 30) do
+	print pain;
+	pain = pain + 1;
+endwhile;
