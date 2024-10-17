@@ -50,6 +50,9 @@ endwhile;
 
 // print "rr-pain";
 
+// context switches
+[SYSTEM_STATUS_TABLE + 24] = [SYSTEM_STATUS_TABLE + 24] + 1;
+
 //resetting the context
 process_table_entry = PROCESS_TABLE + (newPID * 16);
 SP = [process_table_entry + 11] * 512 + [process_table_entry + 12];

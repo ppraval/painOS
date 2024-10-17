@@ -1,0 +1,96 @@
+alias functionNum R1;
+alias currentPID R2;
+alias word R3;
+
+if (functionNum == 1) then // if disk store function
+    alias pageNumber R3;
+    alias blockNum R4;
+
+    multipush(R1, R2, R3, R4);
+    R1 = 3; // calling aquire disk function to lock the disk
+    call RESOURCE_MANAGER;
+    multipop(R1, R2, R3, R4);
+
+    [DISK_STATUS_TABLE + 1] = 1; // we are doing store operation with 1
+    [DISK_STATUS_TABLE + 2] = pageNumber;// page number in memory
+    [DISK_STATUS_TABLE + 3] = blockNum;// block number in disk
+
+    store(pageNumber, blockNum);
+
+    [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_DISK;
+    multipush(R1, R2, R3, R4);
+    call SCHEDULER;
+    multipop(R1, R2, R3, R4);
+    return;
+endif;
+
+if (functionNum == 2) then // if disk load function
+    alias pageNum R3;
+    alias blockNum R4;
+    multipush(R1, R2, R3, R4);
+
+    functionNum = 3;
+    R2 = currentPID;
+
+    call MOD_0;
+
+    multipop(R1, R2, R3, R4);
+
+    [DISK_STATUS_TABLE + 1] = 0; // we are doing Load operation with 0
+    [DISK_STATUS_TABLE + 2] = pageNum; //Page number in Memory
+    [DISK_STATUS_TABLE + 3] = blockNum; // Block number in Disk
+
+    load(pageNum, blockNum);
+
+    [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_DISK;
+
+    call MOD_5;
+
+    return;
+endif;
+if(functionNum == 3) then // if terminal write function
+    multipush(R1, R2, R3);
+    functionNum = 8; // for aquire terminal
+
+    call MOD_0;
+
+    multipop(R1, R2, R3);
+
+    R5 = "Printing";
+    print R5;
+    print word;
+
+    multipush(R1, R2, R3);
+
+    functionNum = 9; // for release terminal
+
+    call MOD_0;
+
+    multipop(R1, R2, R3);
+
+    return;
+endif;
+if (functionNum == 4) then // if terminal read function
+    multipush(R1, R2, R3);
+    functionNum = 8; //for aquire terminal
+
+    call MOD_0;
+
+    multipop(R1, R2, R3);
+
+    R5 = "Reading";
+    print R5;
+    read;
+
+    [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_TERMINAL;
+
+    multipush(R1, R2, R3);
+
+    call MOD_5;
+
+    multipop(R1, R2, R3);
+
+    [[PTBR + 2 * (word / 512)] * 512 + (word % 512)] = [PROCESS_TABLE + currentPID * 16 + 8]; // Storing word from the input buffer into the address space
+
+    return;
+endif;

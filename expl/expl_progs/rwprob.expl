@@ -1,0 +1,89 @@
+type
+Share
+{
+  int isempty;
+  int data;
+}
+endtype
+
+decl
+  Share head;
+enddecl
+
+int main()
+{
+decl
+  int temp, x, pidone, pidtwo, semid, iter, counter;
+enddecl
+
+begin
+  x = exposcall("Heapset");
+  semid = exposcall("Semget");
+  head = exposcall("Alloc", 2);
+  head.isempty = 1;
+  pidone = exposcall("Fork");
+
+  if (pidone == 0) then
+    iter = 1;
+	temp = exposcall("Write", "-2", "pain1");
+    while(iter <= 100) do
+	temp = exposcall("Write", "-2", "painLock");
+      temp = exposcall("SemLock", semid);
+      temp = head.isempty;
+
+      if(temp == 1) then
+        head.data = iter;
+        head.isempty = 0;
+        iter = iter + 2;
+      endif;
+	temp = exposcall("Write", "-2", "painUnlock");
+      temp = exposcall("SemUnLock", semid);
+	temp = exposcall("Write", "-2", "AfUnlock");
+      counter = 0;
+      while(counter < 50) do
+        counter = counter + 1;
+      endwhile;
+    endwhile;
+  else
+    pidtwo =  exposcall("Fork");
+	temp = exposcall("Write", "-2", "pain2");
+    if(pidtwo == 0) then
+      iter = 2;
+      while(iter <= 100) do
+	temp = exposcall("Write", "-2", "pain2lock");
+        temp = exposcall("SemLock", semid);
+        temp = head.isempty;
+
+        if(temp == 1) then
+          head.data = iter;
+          head.isempty = 0;
+          iter = iter + 2;
+        endif;
+	temp = exposcall("Write", "-2", "pain2Unlock");
+        temp = exposcall("SemUnLock", semid);
+	temp = exposcall("Write", "-2", "Af2Unlock");
+      endwhile;
+    else
+      iter = 1;
+      while(iter <= 100) do
+        temp = exposcall("SemLock", semid);
+        temp = head.isempty;
+
+        if(temp == 0) then
+          x = head.data;
+          head.isempty = 1;
+	temp = exposcall("Write", "-2", "AIDSAIDSAIDS");
+          temp = exposcall("Write", -2, x);
+          iter = iter + 1;
+        endif;
+
+        temp = exposcall("SemUnLock", semid);
+      endwhile;
+    endif;
+  endif;
+	temp = exposcall("Write", "-2", "AIDS");
+  temp = exposcall("Semrelease", semid);
+	temp = exposcall("Write", "-2", "afterAIDS");
+  return 0;
+end
+}

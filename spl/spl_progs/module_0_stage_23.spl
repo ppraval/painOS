@@ -1,0 +1,140 @@
+alias functionNum R1;
+alias currentPID R2;
+
+if (functionNum == 3) then //Acquire Disk
+    while ([DISK_STATUS_TABLE] == 1) do
+        [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_DISK;
+        multipush(R1, R2);
+
+        call MOD_5; //Rescheduling the current process while waiting for the disk to be free
+
+        multipop(R1, R2);
+    endwhile;
+    [DISK_STATUS_TABLE] = 1; // Disk is allocated
+    [DISK_STATUS_TABLE + 4] = currentPID;
+    return;
+endif;
+
+if (functionNum == 4) then // acquire inode
+    alias inodeNumber R2;
+    alias currentPID R3;
+    // busy waiting untill the block becomes free
+    while ([FILE_STATUS_TABLE + inodeNumber * 4 + 0] != -1) do
+        [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_FILE;
+        [PROCESS_TABLE + currentPID * 16 + 5] = inodeNumber;
+        multipush(R1, R2, R3);
+        call SCHEDULER;
+        multipop(R1, R2, R3);
+    endwhile;
+
+    // file delete check - some other process might have deleted the file while we were in the above busy wait
+    if ([INODE_TABLE + inodeNumber * 16 + 1] == -1) then
+        R0 = -1;
+    else 
+        [FILE_STATUS_TABLE + inodeNumber * 4 + 0] = currentPID; // locking pid
+        R0 = 0;
+    endif;
+    return;
+endif;
+
+if (functionNum == 5) then // release inode
+    alias inodeNumber R2;
+    alias currentPID R3;
+
+    if ([FILE_STATUS_TABLE + inodeNumber * 4 + 0] == currentPID) then
+        [FILE_STATUS_TABLE + inodeNumber * 4 + 0] = -1; // invalidating the locking pid field
+        alias i R4;
+        i = 0;
+        // waking up all those processes that are waiting for the file with the given inodeNumber
+        while (i < MAX_FILE_NUM) do 
+            if ([PROCESS_TABLE + i * 16 + 4] == WAIT_FILE && [PROCESS_TABLE + i * 16 + 5] == inodeNumber) then
+                [PROCESS_TABLE + i * 16 + 4] = READY;
+            endif;
+            i = i + 1;
+        endwhile;
+        R0 = 0;
+    else
+        R0 = -1;
+    endif;
+    return;
+endif;
+
+if (functionNum == 6) then // Acquire semaphore
+    alias i R3;
+    i = 0;
+    while(i < MAX_SEM_COUNT && [SEMAPHORE_TABLE + 4 * i + 1] != 0) do
+        i = i + 1;
+    endwhile;
+    // all semaphores are being utilized
+    if (i == MAX_SEM_COUNT) then
+        R0 = -1;
+    else
+        [SEMAPHORE_TABLE + 4 * i] = -1;
+        [SEMAPHORE_TABLE + 4 * i + 1] = 1;
+        R0 = i; // returning the semaphore index
+    endif;
+    return;
+endif;
+
+if (functionNum == 7) then // Release semaphore
+    alias semId R2;
+    alias currentPID R3;
+
+    if (currentPID == [SEMAPHORE_TABLE + semId * 4]) then
+        [SEMAPHORE_TABLE + semId * 4] = -1;
+        alias i R4;
+        // wake up all the processes waiting for this semaphore
+        i = 0;
+        while (i < 16) do
+            if ([PROCESS_TABLE + i * 16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + i * 16 + 5] == semId) then
+                [PROCESS_TABLE + i * 16 + 4] = READY;
+                [PROCESS_TABLE + i * 16 + 5] = -1;
+            endif;
+            i = i + 1;
+        endwhile;
+        // decrease the process count for the semaphore
+        [SEMAPHORE_TABLE + 4 * semId + 1] = [SEMAPHORE_TABLE + 4 * semId + 1] - 1;
+    endif;
+    return;
+endif;
+
+if (functionNum == 8) then // Acquire Terminal
+    while ([TERMINAL_STATUS_TABLE] != 0) do
+        [PROCESS_TABLE + currentPID * 16 + 4] = WAIT_TERMINAL;
+        multipush(R1, R2);
+
+        print "Ter-wait";
+        call MOD_5; // Rescheduling the current process while waiting for the terminal to be free
+
+        multipop(R1, R2);
+    endwhile;
+
+    [TERMINAL_STATUS_TABLE] = 1; //Terminal is allocated
+    [TERMINAL_STATUS_TABLE + 1] = currentPID;
+    return;
+else
+if (functionNum == 9) then // Release Terminal
+    if (currentPID != [TERMINAL_STATUS_TABLE + 1]) then
+        alias returnVal R0;
+        returnVal = -1; // Unsuccessful return
+        return;
+    else
+        [TERMINAL_STATUS_TABLE] = 0; // Releasing terminal
+        alias i R3;
+        i = 0;
+        while (i < 16) do
+            if ([PROCESS_TABLE + i * 16 + 4] == WAIT_TERMINAL) then
+                [PROCESS_TABLE + 16 * i + 4] = READY;
+            endif;
+            i = i + 1;
+        endwhile;
+        alias returnVal R0;
+        returnVal = 0; // Successful return
+        return;
+    endif;
+else
+    alias returnVal R0;
+    returnVal = -1; // Unsuccessful return
+    return;
+endif;
+endif;

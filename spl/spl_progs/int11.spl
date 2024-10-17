@@ -1,0 +1,62 @@
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+alias userSP R0;
+userSP = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+alias sysCallNumber R1;
+sysCallNumber = [[PTBR + 2 * ((userSP - 5) / 512)] * 512 + ((userSP - 5) % 512)]; // getting the system call number from the user stack
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = sysCallNumber; // setting the mode flag to system call number
+
+if (sysCallNumber == 11) then // getpid
+    [[PTBR + 2 * ((userSP - 1) / 512)] * 512 + ((userSP - 1) % 512)] = [SYSTEM_STATUS_TABLE + 1]; // getting the pid of the current running process from system status table and storing it to return value on top of the stack
+endif;
+
+if (sysCallNumber == 12) then // getppid
+    [[PTBR + 2 * ((userSP - 1) / 512)] * 512 + ((userSP - 1) % 512)] = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 2]; // getting the pid from process table and storing it to return value on top of the stack
+endif;
+
+if (sysCallNumber == 13) then // wait
+    alias pid R2;
+    pid = [[PTBR + 2 * ((userSP - 4) / 512)] * 512 + ((userSP - 4) % 512)]; 
+    if (pid == [SYSTEM_STATUS_TABLE + 1] || [PROCESS_TABLE + pid * 16 + 4] == TERMINATED || pid < 0 || pid >= 16) then 
+        [[PTBR + 2 * ((userSP - 1) / 512)] * 512 + ((userSP - 1) % 512)] = -1; // if the process is the same process, is terminated and is a outside the valid pid range then return -1
+    else
+
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 4] = WAIT_PROCESS;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 5] = pid;
+
+        multipush(R0, R1, R2);
+        call SCHEDULER;
+        multipop(R0, R1, R2);
+
+        [[PTBR + 2 * ((userSP - 1) / 512)] * 512 + ((userSP - 1) % 512)] = 0; // return value 0 for successful return 
+
+    endif;
+endif;
+
+if (sysCallNumber == 14) then // signal
+    alias i R2;
+
+    i = 0;
+    while (i < 16) do
+        if ([PROCESS_TABLE + i * 16 + 4] == WAIT_PROCESS && [PROCESS_TABLE + i * 16 + 5] == [SYSTEM_STATUS_TABLE + 1]) then // if process is waiting and has pid == currentPid
+            [PROCESS_TABLE + i * 16 + 4] = READY; 
+            // [PROCESS_TABLE + i * 16 + 5] = -1;
+        endif;
+        i = i + 1;
+    endwhile;
+endif;
+
+SP = userSP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+R10 = "---------";
+print R10;
+print "int11";
+print R10;
+ireturn;

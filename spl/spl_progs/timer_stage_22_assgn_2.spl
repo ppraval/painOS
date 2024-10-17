@@ -3,6 +3,17 @@
 
 //sp set to start of kernel stack
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+multipush(R2);
+
+alias prevMemUsage R2;
+prevMemUsage = SYSTEM_STATUS_TABLE + 25;
+if (128 - [SYSTEM_STATUS_TABLE + 2] > [prevMemUsage]) then 
+    [prevMemUsage] = 128 - [SYSTEM_STATUS_TABLE + 2];
+endif;
+
+multipop(R2);
+
 backup;
 
 // pid of the currently executing process
