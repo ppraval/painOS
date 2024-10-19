@@ -1,0 +1,96 @@
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+alias userSP R0;
+userSP = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+alias sysCallNumber R1;
+sysCallNumber = [[PTBR + 2 * ((userSP - 5) / 512)] * 512 + ((userSP - 5) % 512)]; // getting the system call number from the user stack
+
+alias returnAddress R2;
+returnAddress = [PTBR + 2 * ((userSP - 1) / 512)] * 512 + (userSP - 1) % 512;
+
+if (sysCallNumber == 2) then // open system call
+    alias i R3;
+    i = 0;
+
+    alias resourceTable R4;
+    resourceTable = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + RESOURCE_TABLE_OFFSET;
+    // finding a free per-process resource table entry
+    while (i < 8) do
+        if ([resourceTable + i * 2 + 0] == -1) then
+            break;
+        endif;
+        i = i + 1;
+    endwhile;
+
+    // if process has reached the limit of resources then return -3
+    if (i == 16) then
+        [returnAddress] = -3;
+    else
+        alias fileName R5;
+        fileName = [[PTBR + 2 * ((userSP - 4) / 512)] * 512 + (userSP - 4) % 512];
+        alias fileTableEntry R6;
+
+        multipush(R0, R1, R2, R3, R4, R5);
+
+        // calling open function 
+        R1 = 3;
+        R2 = fileName;
+
+        call FILE_MANAGER;
+
+        fileTableEntry = R0;
+        multipop(R0, R1, R2, R3, R4, R5);
+
+        if (fileTableEntry < 0) then
+            [returnAddress] = fileTableEntry;
+        else
+            [resourceTable + i * 2 + 0] = FILE; // type of resource
+            [resourceTable + i * 2 + 1] = fileTableEntry;
+            [returnAddress] = i;
+        endif;
+    endif;
+endif;
+
+if (sysCallNumber == 3) then // close system call
+    alias fileDescriptor R3;
+    fileDescriptor = [[PTBR + 2 * ((userSP - 4)) / 512] * 512 + (userSP - 4) % 512];
+    // if fileDescriptor is out of range then return -1
+    if (fileDescriptor < 0 || fileDescriptor > 7) then
+        [returnAddress] = -1;
+    else
+        alias resourceTableEntry R4;
+        resourceTableEntry = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 + RESOURCE_TABLE_OFFSET + fileDescriptor * 2;
+        if ([resourceTableEntry] != FILE) then // if the resource is not a file return -1
+            [returnAddress] = -1;
+        else
+            alias openFileTableEntry R5;
+            openFileTableEntry = [resourceTableEntry + 1];
+
+            multipush(R0, R1, R2, R3, R4, R5);
+            // calling close function
+            R1 = 4;
+            R2 = openFileTableEntry;
+
+            call FILE_MANAGER;
+
+            multipop(R0, R1, R2, R3, R4, R5);
+
+            [resourceTableEntry + 0] = -1; // invalidating the per-process resource table entry
+            [returnAddress] = 0; // return 0 for success
+        endif;
+    endif;
+endif;
+
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+R10 = "---------";
+print R10;
+print "int5";
+print R10;
+ireturn;
