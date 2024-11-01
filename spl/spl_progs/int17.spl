@@ -1,0 +1,66 @@
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+alias userSP R0;
+userSP = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 27; // setting mode flag to 27 for login
+
+alias username R1;
+alias password R2;
+alias returnAddress R3;
+
+username = [[PTBR + 2 * (userSP - 4) / 512] * 512 + (userSP - 4) % 512];
+password = [[PTBR + 2 * (userSP - 3) / 512] * 512 + (userSP - 3) % 512];
+returnAddress = [PTBR + 2 * (userSP - 1) / 512] * 512 + (userSP - 1) % 512;
+
+if ([SYSTEM_STATUS_TABLE + 1] != 1) then // if process is not init(login i.e pid 1)
+    [returnAddress] = -1; //return -1
+else
+    alias i R4;
+    i = 0;
+    // checking the user table to see if the username is present or not
+    while (i < MAX_USER_NUM) do
+        if ([USER_TABLE + i * 2 + 0] == username) then 
+            break;
+        endif;
+        i = i + 1;
+    endwhile;
+
+    if (i == MAX_USER_NUM) then
+        [returnAddress] = -1; //return -1 if user not found
+    else
+        // encrypt password
+        alias encryptedPassword R5;
+        encryptedPassword = password;
+        encrypt encryptedPassword;
+
+        // if encrypted password is not found in the user table
+        if (encryptedPassword != [USER_TABLE + i * 2 + 1]) then 
+            [returnAddress] = -1; // return -1
+        else
+            [PROCESS_TABLE + 32 + 3] = i; // setting userid
+            [PROCESS_TABLE + 32 + 4] = CREATED; // setting the shell process to CREATED
+
+            [PROCESS_TABLE + 16 + 4] = WAIT_PROCESS; // setting init(login) to wait
+            [PROCESS_TABLE + 16 + 5] = 2; //waiting for SHELL to finish
+
+            [SYSTEM_STATUS_TABLE + 0] = i; //setting userid
+
+            multipush(R0, R1, R2, R3, R4, R5);
+            call SCHEDULER;
+            multipop(R0, R1, R2, R3, R4, R5);
+
+            [returnAddress] = 0;
+
+        endif;
+    endif;
+endif;
+
+SP = userSP;
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]) * 16 + 9] = 0;
+
+ireturn;

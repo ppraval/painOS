@@ -1,0 +1,40 @@
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+alias userSP R0;
+userSP = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 28; // setting mode flag to 28 for logout
+
+alias returnAddress R1;
+
+returnAddress = [PTBR + 2 * ((userSP - 1) / 512)] * 512 + (userSP - 1) % 512;
+
+if ([SYSTEM_STATUS_TABLE + 1] != 2) then // if process is not the shell process
+    [returnAddress] = -1; // return -1
+else
+    multipush(R0, R1);
+    //calling kill all to kill all processes except idle and init(here login)
+    R1 = 5;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+
+    call PROCESS_MANAGER;
+    multipop(R0, R1);
+
+    [PROCESS_TABLE + 32 + 4] = TERMINATED; // setting state of shell to TERMINATED
+    [[PTBR + 16] * 512] = [[PTBR + 8] * 512 + 1]; // reset entry point to starting IP of the shell 
+    [PROCESS_TABLE + 16 + 4] = READY; // waking up the init(login) process
+    [PROCESS_TABLE + 32 + 13] = 8 * 512; //resetting user stack for the new user that will come in the future
+    [SYSTEM_STATUS_TABLE] = 0; //setting current user_id to 0 (kernel)
+
+    multipush(R0, R1);
+    call SCHEDULER;
+    multipop(R0, R1);
+endif;
+
+SP = userSP;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+ireturn;

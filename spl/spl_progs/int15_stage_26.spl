@@ -1,0 +1,74 @@
+// store user stack pointer in UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = SP;
+
+alias userSP R0;
+userSP = SP;
+
+// set SP to start of kernel stack
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 21; // setting mode flag to 21 for shutdown
+
+//if the current process is not shell(pid 2) or the current user is not root return
+if ([SYSTEM_STATUS_TABLE + 1] != 2 && [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 3] != 1) then
+    SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13];
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+    [[PTBR + 2 * ((userSP - 1) % 512)] * 512 + (userSP - 1) % 512] = -1;
+    ireturn;
+else
+    //calling Kill All
+    multipush(R0, R1);
+    R1 = 5;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    call PROCESS_MANAGER;
+    multipop(R0, R1);
+
+    // for all disk blocks
+    alias i R2;
+    i = 0;
+    while (i < 4) do
+        // if the block is dirty
+        if ([BUFFER_TABLE + 4 * i + 1] == 1) then
+            multipush(R0, R1, R2);
+
+            R2 = [SYSTEM_STATUS_TABLE + 1];
+            R3 = BUFFER_BASE + i;
+            R4 = [BUFFER_TABLE + 4 * i];
+            R1 = 1; //calling disk store to write back
+
+            call DEVICE_MANAGER;
+            multipop(R0, R1, R2);
+        endif;
+        i = i + 1;
+    endwhile;
+
+    // inode table
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 59;
+    R4 = 3;
+    call DEVICE_MANAGER;
+
+    // user table
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 60;
+    R4 = 4;
+    call DEVICE_MANAGER;
+
+    // root file
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 62;
+    R4 = 5;
+    call DEVICE_MANAGER;
+
+    // disk free list
+    R1 = 1;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    R3 = 61;
+    R4 = 2;
+    call DEVICE_MANAGER;
+
+    halt;
+endif;
