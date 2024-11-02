@@ -1,0 +1,11 @@
+load --exec ../expl/expl_progs/27ass2.xsm
+load --exec ../expl/expl_progs/27ass3.xsm
+load --exec ../expl/expl_progs/27ass4.xsm
+load --exec ../expl/expl_progs/fork4.xsm
+load --exec ../expl/expl_progs/m_merge.xsm
+load --exec ../expl/expl_progs/m_sort.xsm
+load --exec ../expl/expl_progs/m_store.xsm
+load --exec ../expl/expl_progs/pgm1.xsm
+load --exec ../expl/expl_progs/pgm2.xsm
+load --exec ../expl/expl_progs/merge.xsm
+exit

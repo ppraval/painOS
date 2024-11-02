@@ -1,0 +1,101 @@
+alias currentPID R0;
+alias process_table_entry R1;
+
+currentPID = [SYSTEM_STATUS_TABLE + 1];
+process_table_entry = PROCESS_TABLE + 16 * currentPID;
+
+// R6 = "BP =  ";
+// print R6;
+// print BP;
+
+multipush(BP); //pushing BP of the current process to the top of the stack
+
+//storing values in the process table
+[process_table_entry + 12] = SP % 512;
+[process_table_entry + 14] = PTBR;
+[process_table_entry + 15] = PTLR;
+
+alias i R2;
+alias state R3;
+alias newPID R4;
+
+//checking the paging status bit in the system status table
+if ([SYSTEM_STATUS_TABLE + 5] != 0) then // if swap-in/swap-out
+    if ([PROCESS_TABLE + 15 * 16 + 4] == WAIT_DISK) then // if the swap process is waiting for disk
+        i = 0; // schedule idle
+    else
+        i = SWAPPER_DAEMON; // else schedule swapper daemon (pid 15)
+    endif;
+else // if there is no swapping process then we do normal round robin
+    
+    i = currentPID + 1;
+    //looping to
+    while (i < 16) do
+        state = [PROCESS_TABLE + i * 16 + 4];
+        //checking the process state and also the swap flag in the process table
+        if ((state == READY || state == CREATED) && [PROCESS_TABLE + i * 16 + 6] != 1) then
+            break;
+        endif;
+        i = i + 1;
+    endwhile;
+    //edge case
+    if (i == 16) then
+        i = 1;
+        while (i < currentPID) do
+            state = [PROCESS_TABLE + i * 16 + 4];
+            if ((state == CREATED || state == READY) && [PROCESS_TABLE + i * 16 + 6] != 1) then
+                break;
+            endif;
+            i = i + 1;
+        endwhile;
+    endif;
+
+    //if we select the currentPID then we schedule idle
+    if (i == currentPID) then
+        i = 0;
+    endif;
+endif;
+
+newPID = i;
+
+// R6 = "Curr PID = ";
+// print R6;
+// print currentPID;
+// R6 = "State = ";
+// print R6;
+// print state;
+// R6 = "------";
+// print R6;
+// R6 = "Next PID = ";
+// print R6;
+// print newPID;
+// R6 = "State = ";
+// print R6;
+// print state;
+// R6 = "------";
+// print R6;
+
+// print "rr-pain";
+
+//resetting the context
+process_table_entry = PROCESS_TABLE + (newPID * 16);
+SP = [process_table_entry + 11] * 512 + [process_table_entry + 12];
+PTBR = [process_table_entry + 14];
+PTLR = [process_table_entry + 15];
+
+[SYSTEM_STATUS_TABLE + 1] = newPID;
+
+//executing the current program
+if (state == CREATED) then
+    SP = [process_table_entry + 13];
+    BP = [[process_table_entry + 11] * 512]; // storing first word of the kernel stack to BP i.e restoring
+    [process_table_entry + 4] = RUNNING;
+    [process_table_entry + 9] = 0;
+    ireturn;
+endif;
+
+[process_table_entry + 4] = RUNNING;
+
+multipop(BP);
+
+return;
