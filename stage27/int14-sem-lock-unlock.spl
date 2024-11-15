@@ -1,0 +1,101 @@
+// breakpoint;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1, systemCallNumber
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+
+alias systemCallNumber R1;
+systemCallNumber = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+if (systemCallNumber == INT_SEMLOCK) then
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 19;
+
+    alias semDescriptor R2;
+    semDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    alias kernelStack R3;
+    kernelStack = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+
+    if (semDescriptor < 0 || semDescriptor > 7 || [(kernelStack+1)*512 - 2*(semDescriptor+8)] != SEMAPHORE) then
+        [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias semTableIndex R4; 
+    semTableIndex = [(kernelStack+1)*512 - 2*(semDescriptor+8) + 1];
+
+    while ([SEMAPHORE_TABLE + semTableIndex*4] != -1 && [SEMAPHORE_TABLE + semTableIndex*4] != [SYSTEM_STATUS_TABLE + 1]) do
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = WAIT_SEMAPHORE;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 5] = semTableIndex;
+
+        multipush (R0, R1, R2, R3, R4);
+        call SCHEDULER;
+        multipop  (R0, R1, R2, R3, R4);
+    endwhile;
+
+    [SEMAPHORE_TABLE + semTableIndex*4] = [SYSTEM_STATUS_TABLE+1];
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_SEMUNLOCK) then
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 20;
+
+    alias semDescriptor R2;
+    semDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    alias kernelStack R3;
+    kernelStack = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+
+    if (semDescriptor < 0 || semDescriptor > 7 || [(kernelStack+1)*512 - 2*(semDescriptor+8)] != SEMAPHORE) then
+        [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias semTableIndex R4;
+    semTableIndex = [(kernelStack+1)*512 - 2*(semDescriptor+8) + 1];
+    if ([SEMAPHORE_TABLE + semTableIndex*4] != -1) then
+        if ([SEMAPHORE_TABLE + semTableIndex*4] != [SYSTEM_STATUS_TABLE + 1]) then
+            [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+            [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+            SP = userSP;
+
+            // breakpoint;
+            ireturn;
+        endif;
+
+        [SEMAPHORE_TABLE + semDescriptor*4] = -1;
+
+        alias counter R5;
+        counter = 0;
+        while (counter < MAX_PROC_NUM) do
+            if ([PROCESS_TABLE + counter*16 + 4] == WAIT_SEMAPHORE && [PROCESS_TABLE + counter*16 + 5] == semTableIndex) then
+                [PROCESS_TABLE + counter*16 + 4] = READY;
+            endif;
+            counter = counter + 1;
+        endwhile;
+    endif;
+
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;

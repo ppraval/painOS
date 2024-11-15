@@ -1,0 +1,119 @@
+// loading module 7 from disk to memory
+loadi(54, 67);
+loadi(55, 68);
+
+SP = 77*512 - 1;
+call BOOT_MODULE;
+
+//---------------------------------- IDLE PROGRAM --------------------------
+// loading IDLE Program from disk to memory
+loadi (69, 11);
+
+alias currentPCB R1;
+currentPCB = PROCESS_TABLE;
+[currentPCB + 1] = 0;
+[currentPCB + 3] = 1;
+[currentPCB + 4] = RUNNING;
+[currentPCB + 11] = 76;
+[currentPCB + 12] = 0;
+[currentPCB + 13] = 8*512;
+[currentPCB + 14] = PAGE_TABLE_BASE;
+[currentPCB + 15] = 10;
+
+alias currentPT R2;
+currentPT = PAGE_TABLE_BASE;
+//Library
+[currentPT + 0] = -1;
+[currentPT + 1] = "0000";
+[currentPT + 2] = -1;
+[currentPT + 3] = "0000";
+
+//Heap
+[currentPT + 4] = -1;
+[currentPT + 5] = "0110";
+[currentPT + 6] = -1;
+[currentPT + 7] = "0110";
+
+//Code
+[currentPT + 8] = 69;
+[currentPT + 9] = "0100";
+[currentPT + 10] = -1;
+[currentPT + 11] = "0000";
+[currentPT + 12] = -1;
+[currentPT + 13] = "0000";
+[currentPT + 14] = -1;
+[currentPT + 15] = "0000";
+
+//Stack
+[currentPT + 16] = 70;
+[currentPT + 17] = "0110";
+[currentPT + 18] = -1;
+[currentPT + 19] = "0000";
+
+[70*512] = [69*512 + 1];
+
+//---------------------------------- SWAPPER_DAEMON PROGRAM --------------------------
+// alias currentPCB R1;
+currentPCB = PROCESS_TABLE + 15*16;
+[currentPCB + 1] = 0;
+[currentPCB + 3] = 1;
+[currentPCB + 4] = CREATED;
+[currentPCB + 11] = 82;
+[currentPCB + 12] = 0;
+[currentPCB + 13] = 8*512;
+[currentPCB + 14] = PAGE_TABLE_BASE + 15*20;
+[currentPCB + 15] = 10;
+
+// alias currentPT R2;
+currentPT = PAGE_TABLE_BASE + 15*20;
+//Library
+[currentPT + 0] = -1;
+[currentPT + 1] = "0000";
+[currentPT + 2] = -1;
+[currentPT + 3] = "0000";
+
+//Heap
+[currentPT + 4] = -1;
+[currentPT + 5] = "0110";
+[currentPT + 6] = -1;
+[currentPT + 7] = "0110";
+
+//Code
+[currentPT + 8] = 69;
+[currentPT + 9] = "0100";
+[currentPT + 10] = -1;
+[currentPT + 11] = "0000";
+[currentPT + 12] = -1;
+[currentPT + 13] = "0000";
+[currentPT + 14] = -1;
+[currentPT + 15] = "0000";
+
+//Stack
+[currentPT + 16] = 81;
+[currentPT + 17] = "0110";
+[currentPT + 18] = -1;
+[currentPT + 19] = "0000";
+
+[81*512] = [69*512 + 1];
+
+// setting PageTableBase and PageTableLength registers
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+SP = 8*512;
+
+[TERMINAL_STATUS_TABLE + 0] = 0;
+
+[SYSTEM_STATUS_TABLE] = 1;
+[SYSTEM_STATUS_TABLE + 1] = 0;
+[SYSTEM_STATUS_TABLE + 2] = 45;
+[SYSTEM_STATUS_TABLE + 3] = 0;
+[SYSTEM_STATUS_TABLE + 4] = 0;
+[SYSTEM_STATUS_TABLE + 5] = 0;
+
+[DISK_STATUS_TABLE + 0] = 0;
+
+alias counter R5;
+
+breakpoint;
+ireturn;

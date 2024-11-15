@@ -1,0 +1,285 @@
+// breakpoint;
+
+// loading the inode table from disk to memory
+loadi (59, 3);
+loadi (60, 4);
+
+// loading the disk free list
+loadi (61, 2);
+
+// loading exception handler routine from disk to memory
+loadi (2, 15);
+loadi (3, 16);
+
+// loading timer interrupt
+loadi (4, 17);
+loadi (5, 18);
+
+// loading disk interrupt
+loadi (6, 19);
+loadi (7, 20);
+
+// loading console interrupt
+loadi (8, 21);
+loadi (9, 22);
+
+// loading interrupt 4 from disk to memory (file create-delete)
+loadi (10, 23);
+loadi (11, 24);
+
+// loading interrupt 5 from disk to memory (file open-close)
+loadi (12, 25);
+loadi (13, 26);
+
+// loading interrupt 6 from disk to memory (reading)
+loadi (14, 27);
+loadi (15, 28);
+
+// loading interrupt 7 from disk to memory (writing)
+loadi (16, 29);
+loadi (17, 30);
+
+// loading interrupt 8 from disk to memory (fork)
+loadi (18, 31);
+loadi (19, 32);
+
+// loading interrupt 9 from disk to memory (exec)
+loadi (20, 33);
+loadi (21, 34);
+
+// loading interrupt 10 from disk to memory (halting)
+loadi (22, 35);
+loadi (23, 36);
+
+// loading interrupt 11 from disk to memory (pid, ppid, wait, signal)
+loadi (24, 37);
+loadi (25, 38);
+
+// loading interrupt 12 from disk to memory (logout)
+loadi (26, 39);
+loadi (27, 40);
+
+// loading interrupt 13 from disk to memory (semaphore acquire-release)
+loadi (28, 41);
+loadi (29, 42);
+
+// loading interrupt 14 from disk to memory (semaphore lock-unlock)
+loadi (30, 43);
+loadi (31, 44);
+
+// loading interrupt 15 from disk to memory (shutdown)
+loadi (32, 45);
+loadi (33, 46);
+
+// loading interrupt 16 from disk to memory (uid-password)
+loadi (34, 47);
+loadi (35, 48);
+
+// loading interrupt 17 from disk to memory (login)
+loadi (36, 49);
+loadi (37, 50);
+
+// loading module 0 from disk to memory (resource manager)
+loadi (40, 53);
+loadi (41, 54);
+
+// loading module 1 from disk to memory (process manager)
+loadi (42, 55);
+loadi (43, 56);
+
+// loading module 2 from disk to memory (memory manager)
+loadi (44, 57);
+loadi (45, 58);
+
+// loading module 3 from disk to memory (files manager)
+loadi (46, 59);
+loadi (47, 60);
+
+// loading module 4 from disk to memory (device manager)
+loadi (48, 61);
+loadi (49, 62);
+
+// loading module 5 from disk to memory (scheduler)
+loadi (50, 63);
+loadi (51, 64);
+
+// loading module 6 from disk to memory (pager)
+loadi (52, 65);
+loadi (53, 66);
+
+// loading the library code
+loadi (63, 13);
+loadi (64, 14);
+
+// setting process table entries to TERMINATED
+alias counter R5;
+counter = 0;
+while (counter < MAX_PROC_NUM) do
+    [PROCESS_TABLE + counter*16] = 0;
+    [PROCESS_TABLE + counter*16 + 4] = TERMINATED;
+    counter = counter + 1;
+endwhile;
+
+//---------------------------------- INIT PROGRAM --------------------------
+// loading INIT program from disk to memory
+loadi (65, 7);
+
+alias currentPCB R1;
+currentPCB = PROCESS_TABLE + 1*16;
+[currentPCB + 1] = 1;
+[currentPCB + 3] = 1;
+[currentPCB + 4] = CREATED;
+[currentPCB + 11] = 77; 
+[currentPCB + 12] = 0;
+[currentPCB + 13] = 8*512;
+[currentPCB + 14] = PAGE_TABLE_BASE+20;
+[currentPCB + 15] = 10;
+
+alias currentPT R2;
+currentPT = PAGE_TABLE_BASE + 1*20;
+//library
+[currentPT + 0] = 63;
+[currentPT + 1] = "0100";
+[currentPT + 2] = 64;
+[currentPT + 3] = "0100";
+
+//heap
+[currentPT + 4] = -1;
+[currentPT + 5] = "0000";
+[currentPT + 6] = -1;
+[currentPT + 7] = "0000";
+
+//Code
+[currentPT + 8] = 65;
+[currentPT + 9] = "0100";
+[currentPT + 10] = -1;
+[currentPT + 11] = "0000";
+[currentPT + 12] = -1;
+[currentPT + 13] = "0000";
+[currentPT + 14] = -1;
+[currentPT + 15] = "0000";
+
+//Stack
+[currentPT + 16] = 66;
+[currentPT + 17] = "0110";
+[currentPT + 18] = -1;
+[currentPT + 19] = "0000";
+
+//Setting top of stack to the second word in header
+[66*512] = [65*512 + 1];
+
+counter = 1;
+while (counter <= 8) do
+    [77*512 - (counter*2)] = -1;
+    counter = counter + 1;
+endwhile;
+
+//---------------------------------- SHELL PROGRAM --------------------------
+loadi (67, 9);
+loadi (68, 10);
+
+currentPCB = PROCESS_TABLE + 2*16;
+[currentPCB + 0] = 0;
+[currentPCB + 1] = 2;
+[currentPCB + 2] = 1;
+[currentPCB + 3] = 1;
+[currentPCB + 4] = TERMINATED;
+[currentPCB + 11] = 80;
+[currentPCB + 12] = 0;
+[currentPCB + 13] = 8*512;
+[currentPCB + 14] = PAGE_TABLE_BASE+40;
+[currentPCB + 15] = 10;
+
+currentPT = PAGE_TABLE_BASE + 2*20;
+
+//Library
+[currentPT + 0] = 63;
+[currentPT + 1] = "0100";
+[currentPT + 2] = 64;
+[currentPT + 3] = "0100";
+
+//Heap
+[currentPT + 4] = -1;
+[currentPT + 5] = "0000";
+[currentPT + 6] = -1;
+[currentPT + 7] = "0000";
+
+//Code
+[currentPT + 8] = 67;
+[currentPT + 9] = "0100";
+[currentPT + 10] = 68;
+[currentPT + 11] = "0100";
+[currentPT + 12] = -1;
+[currentPT + 13] = "0000";
+[currentPT + 14] = -1;
+[currentPT + 15] = "0000";
+
+//Stack
+[currentPT + 16] = 78;
+[currentPT + 17] = "0110";
+[currentPT + 18] = 79;
+[currentPT + 19] = "0110";
+
+[78*512] = [67*512 + 1];
+
+counter = 0;
+while (counter < 8) do
+    [80*512 + RESOURCE_TABLE_OFFSET + 2*counter] = -1;
+    counter = counter + 1;
+endwhile;
+
+// ------------------------------------- PAGE-TABLE SET UP DONE -------------------------------------------------
+
+// setting up memory-free-list
+counter = 0;
+while (counter <= 80) do
+    [MEMORY_FREE_LIST + counter] = 1;
+    counter = counter + 1;
+endwhile;
+
+while (counter < 128) do
+    [MEMORY_FREE_LIST + counter] = 0;
+    counter = counter + 1;
+endwhile;
+
+counter = 0;
+while (counter < 10) do
+    [DISK_MAP_TABLE + 20 + counter] = -1;
+    counter = counter + 1;
+endwhile;
+ 
+[DISK_MAP_TABLE + 20 + 4] = 67;
+[DISK_MAP_TABLE + 20 + 5] = 68;
+
+counter = 0;
+while (counter < MAX_SEM_COUNT) do
+    [SEMAPHORE_TABLE + counter*4] = -1;
+    [SEMAPHORE_TABLE + counter*4 + 1] = 0;
+
+    counter = counter + 1;
+endwhile;
+
+counter = 0;
+while (counter < MAX_BUFFER) do
+    [BUFFER_TABLE + counter*4 + 0] = -1;
+    [BUFFER_TABLE + counter*4 + 1] = 0;
+    [BUFFER_TABLE + counter*4 + 2] = -1;
+    counter = counter + 1;
+endwhile;
+
+counter = 0;
+while (counter < MAX_OPENFILE_NUM) do
+    [OPEN_FILE_TABLE + counter*4 + 0] = -1;
+    [OPEN_FILE_TABLE + counter*4 + 1] = 0;
+    counter = counter + 1;
+endwhile;
+
+counter = 0;
+while (counter < MAX_FILE_NUM) do
+    [FILE_STATUS_TABLE + counter*4 + 0] = -1;
+    [FILE_STATUS_TABLE + counter*4 + 1] = -1;
+    counter = counter + 1;
+endwhile;
+
+// breakpoint;
+return;

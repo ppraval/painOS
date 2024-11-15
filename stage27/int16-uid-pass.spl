@@ -1,0 +1,251 @@
+// breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]+16 + 11]*512 - 1;
+
+alias userSP R11;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+alias currentPCB R12;
+currentPCB = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+alias returnAddress R13;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+alias systemCallNumber R1;
+systemCallNumber = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+alias username R2;
+username = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+alias password R3;
+password = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+if (systemCallNumber == INT_NEWUSR) then
+    [currentPCB + 9] = 22;
+
+    if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE+1] != 2) then
+        [returnAddress] = -2;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias counter R5;
+    counter = 0;
+    while (counter < MAX_USER_NUM) do
+        if ([USER_TABLE + 2*counter] == -1) then
+            break;
+        endif;
+        if ([USER_TABLE + 2*counter] == username) then
+            [returnAddress] = -1;
+            [currentPCB + 9] = 0;
+            SP = userSP;
+
+            // breakpoint;
+            ireturn;
+        endif;
+
+        counter = counter + 1;
+    endwhile;
+
+    if (counter == MAX_USER_NUM) then
+        [returnAddress] = -3;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    encrypt password;
+
+    [USER_TABLE + 2*counter + 0] = username;
+    [USER_TABLE + 2*counter + 1] = password;
+
+    [returnAddress] = 0;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_REMUSR) then
+    [currentPCB + 9] = 23;
+
+    if ([SYSTEM_STATUS_TABLE] != 1 || [SYSTEM_STATUS_TABLE+1] != 2) then
+        [returnAddress] = -2;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    if (username == "root" || username == "kernel") then
+        [returnAddress] = -2;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias counter R5;
+    counter = 0;
+    alias userID R4;
+    while (counter < MAX_USER_NUM) do
+        if ([USER_TABLE + 2*counter] == username) then
+            userID = counter;
+            break;
+        endif;
+        counter = counter + 1;
+    endwhile;
+
+    if (counter == MAX_USER_NUM) then
+        [returnAddress] = -1;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;  
+
+    counter = 0;
+    while (counter < MAX_FILE_NUM) do
+        if ([ROOT_FILE + counter*8 + 3] == userID) then
+            [returnAddress] = -3;
+            [currentPCB + 9] = 0;
+            SP = userSP;
+
+            // breakpoint;
+            ireturn;
+        endif;
+        counter = counter + 1;
+    endwhile;
+
+    [USER_TABLE + 2*userID + 0] = -1;
+    [USER_TABLE + 2*userID + 1] = -1;
+
+    [returnAddress] = 0;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_SETPWD) then
+    [currentPCB + 9] = 24;
+
+    if ([SYSTEM_STATUS_TABLE+1] != 2) then
+        [returnAddress] = -1;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    // alias username R2;
+    // alias password R3;
+    // username = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+    // password = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+    alias counter R5;
+    counter = 0;
+
+    alias userID R4;
+    while (counter < MAX_USER_NUM) do
+        if ([USER_TABLE + 2*counter] == username) then
+            userID = counter;
+            break;
+        endif;
+        counter = counter + 1;
+    endwhile;
+
+    if (counter == MAX_USER_NUM) then
+        [returnAddress] = -2;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    if ([SYSTEM_STATUS_TABLE] != counter && [SYSTEM_STATUS_TABLE] != 1) then
+        [returnAddress] = -1;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    encrypt password;
+
+    [USER_TABLE + 2*userID + 1] = password;
+
+    [returnAddress] = 0;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_GETUNAME) then
+    [currentPCB + 9] = 25;
+
+    alias userID R4;
+    // userID = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+    userID = username;
+
+    if (userID < 0 || userID >= MAX_USER_NUM) then
+        [returnAddress] = -1;
+        [currentPCB + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    [returnAddress] = [USER_TABLE + 2*userID];
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_GETUID) then
+    [currentPCB + 9] = 26;
+
+    // alias username R2;
+    // username = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    alias counter R5;
+    counter = 0;
+    while (counter < MAX_USER_NUM) do
+        if ([USER_TABLE + 2*counter] == username) then
+            [returnAddress] = counter;
+            [currentPCB + 9] = 0;
+            SP = userSP;
+
+            // breakpoint;
+            ireturn;
+        endif;
+
+        counter = counter+1;
+    endwhile;
+
+    [returnAddress] = -1;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+

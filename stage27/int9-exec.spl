@@ -1,0 +1,114 @@
+// breakpoint;
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 9] = 9;
+
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]* 16) + 11] * 512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 13];
+
+alias fileName R1;
+fileName = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+alias inodeIndex R2;
+alias counter R5;
+counter = 0;
+while (counter < MAX_FILE_NUM) do
+    if ([INODE_TABLE + 16*counter + 1] == fileName) then
+        if ([INODE_TABLE + 16*counter] == EXEC) then
+            inodeIndex = counter;
+        endif;
+        break;
+    endif;
+    counter = counter + 1;
+endwhile;
+
+if (counter == MAX_FILE_NUM) then
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+    [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 9] = 0;
+    SP = userSP;
+    
+    // breakpoint;
+    ireturn;
+endif;
+
+multipush (R0, R1, R2);
+R1 = EXIT_PROCESS;
+R2 = [SYSTEM_STATUS_TABLE + 1];
+call PROCESS_MANAGER;
+multipop  (R0, R1, R2);
+
+alias userAreaPage R3;
+userAreaPage = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+[MEMORY_FREE_LIST + userAreaPage] = 1;
+[SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
+
+SP = userAreaPage*512 - 1;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = RUNNING;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 7] = inodeIndex;
+
+[PTBR + 0] = 63;
+[PTBR + 1] = "0100";
+[PTBR + 2] = 64;
+[PTBR + 3] = "0100";
+
+[PTBR + 4] = -1;
+[PTBR + 5] = "0000";
+[PTBR + 6] = -1;
+[PTBR + 7] = "0000";
+
+multipush (R0, R2, R3);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+[PTBR + 16] = R0;
+[PTBR + 17] = "0110";
+
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+[PTBR + 18] = R0;
+[PTBR + 19] = "0110";
+multipop  (R0, R2, R3);
+
+// setting code page 1
+multipush (R0, R2, R3);
+R1 = GET_CODE_PAGE;
+R2 = [INODE_TABLE + 16*inodeIndex + 8];
+call MEMORY_MANAGER;
+[PTBR + 8] = R0;
+[PTBR + 9] = "0100";
+multipop  (R0, R2, R3);
+
+// setting other page table entries as invalid
+[PTBR + 10] = -1;
+[PTBR + 11] = "0000";
+[PTBR + 12] = -1;
+[PTBR + 13] = "0000";
+[PTBR + 14] = -1;
+[PTBR + 15] = "0000";
+
+counter = 0;
+while (counter < 10) do
+    [DISK_MAP_TABLE+ [SYSTEM_STATUS_TABLE + 1]*10 + counter] = -1;
+    counter = counter + 1;
+endwhile;
+
+alias diskMapEntry R4;
+diskMapEntry = DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10;
+alias inodeEntry R6;
+inodeEntry = INODE_TABLE + 16*inodeIndex;
+
+counter = 0;
+while (counter < 4) do
+    [diskMapEntry + counter + 4] = [inodeEntry + counter + 8];
+    counter = counter + 1;
+endwhile;
+
+SP = 8*512;
+[[PTBR+16]*512] = [[PTBR+8]*512 +1];
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 0;
+
+// breakpoint;
+ireturn; 

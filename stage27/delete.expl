@@ -1,0 +1,17 @@
+int main(){
+	decl
+		str name;
+		int temp;
+	enddecl	
+	begin
+		temp = exposcall("Read",-1,name);
+		temp = exposcall("Delete",name);
+		
+		if (temp == 0) then
+			temp = exposcall ("Write", -2, "deleted");
+		else 
+			temp = exposcall("Write", -2, "failed");
+		endif;
+		return 0;
+	end
+}

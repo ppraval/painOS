@@ -1,0 +1,81 @@
+// breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 27;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1, systemCallNumber
+
+alias userSP R11;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+alias currentPCB R12;
+currentPCB = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+alias returnAddress R13;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+if ([SYSTEM_STATUS_TABLE+1] != 1) then
+    [returnAddress] = -2;
+    SP = userSP;
+    [currentPCB + 9] = 0;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+alias username R1;
+username = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+alias userTableEntry R3;
+alias counter R5;
+counter = 0;
+while (counter < MAX_USER_NUM) do
+    if ([USER_TABLE + counter*2] == username) then
+        userTableEntry = USER_TABLE + 2*counter;
+        break;
+    endif;
+    counter = counter + 1;
+endwhile;
+
+if (counter == MAX_USER_NUM) then
+    [returnAddress] = -1;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+alias password R2;
+password = [[PTBR + 2*((userSP-3)/512)]*512 + (userSP-3)%512];
+
+encrypt password;
+
+if ([userTableEntry + 1] != password) then
+    [returnAddress] = -1;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+[PROCESS_TABLE + 2*16 + 3] = (userTableEntry - USER_TABLE)/2;
+[PROCESS_TABLE + 2*16 + 4] = CREATED;
+
+[currentPCB + 4] = WAIT_PROCESS;
+[currentPCB + 5] = 2;
+
+[SYSTEM_STATUS_TABLE] = (userTableEntry - USER_TABLE)/2;
+
+multipush (R11, R12);
+call SCHEDULER;
+multipop  (R11, R12);
+
+// [returnAddress] = 0;
+[currentPCB + 9] = 0;
+SP = userSP;
+
+// breakpoint;
+ireturn;

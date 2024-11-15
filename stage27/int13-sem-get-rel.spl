@@ -1,0 +1,97 @@
+// breakpoint;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11] * 512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1, systemCallNumber
+
+alias userSP R0;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+
+alias systemCallNumber R1;
+systemCallNumber = [[PTBR + 2*((userSP-5)/512)]*512 + (userSP-5)%512];
+
+if (systemCallNumber == INT_SEMGET) then
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 17;
+
+    alias kernelStack R2;
+    kernelStack = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+
+    alias counter R5;
+    counter = 8;
+    while (counter >= 1) do
+        if ([(kernelStack+1)*512 - 2*counter] == -1) then
+            break;
+        endif;
+        counter = counter - 1;
+    endwhile;
+
+    if (counter == 0) then
+        [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    alias semTableIndex R3;
+    multipush (R0, R1, R2, R5);
+    R1 = ACQUIRE_SEMAPHORE;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    semTableIndex = R0;
+    multipop  (R0, R1, R2, R5);
+
+    if (semTableIndex == -1) then
+        [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = -2;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    [(kernelStack+1)*512 - 2*(counter) + 0] = SEMAPHORE;
+    [(kernelStack+1)*512 - 2*(counter) + 1] = semTableIndex;
+
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = (counter - 8);
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if (systemCallNumber == INT_SEMRELEASE) then
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 9] = 18;
+
+    alias semDescriptor R2;
+    semDescriptor = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
+
+    alias kernelStack R3;
+    kernelStack = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 11];
+
+    if (semDescriptor < 0 || semDescriptor > 7 || [(kernelStack+1)*512 - 2*(semDescriptor+8)] != SEMAPHORE) then
+        [[PTBR + 2*((userSP-1)/512)] + (userSP-1)%512] = -1;
+        [PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1]*16 + 9] = 0;
+        SP = userSP;
+
+        // breakpoint;
+        ireturn;
+    endif;
+
+    multipush (R0, R1, R2, R3);
+    R1 = RELEASE_SEMAPHORE;
+    R2 = [(kernelStack+1)*512 - 2*(semDescriptor+8) + 1];
+    R3 = [SYSTEM_STATUS_TABLE + 1];
+    call RESOURCE_MANAGER;
+    multipop  (R0, R1, R2, R3);
+
+    [[PTBR + 2*((userSP-1)/512)] + (userSP-1)%512] = 0;
+    [PROCESS_TABLE + [SYSTEM_STATUS_TABLE +1]*16 + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;

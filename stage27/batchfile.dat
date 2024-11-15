@@ -1,0 +1,41 @@
+load --init ../stage27/init.xsm
+load --idle ../stage27/idle.xsm
+load --shell ../stage27/shell.xsm
+load --exec ../stage27/create.xsm
+load --exec ../stage27/delete.xsm
+load --exec ../stage27/merge.xsm
+load --exec ../stage27/m_merge.xsm
+load --exec ../stage27/m_sort.xsm
+load --exec ../stage27/m_store.xsm
+load --exec ../stage27/test8.xsm
+load --exec ../stage27/test9.xsm
+load --exec ../stage27/pgm1.xsm
+load --exec ../stage27/test11.xsm
+load --exec ../stage27/pgm2.xsm
+load --exhandler ../stage27/exception.xsm
+load --int=console ../stage27/int-console.xsm
+load --int=disk ../stage27/int-disk.xsm
+load --int=timer ../stage27/int-timer.xsm
+load --int=4 ../stage27/int4-file.xsm
+load --int=5 ../stage27/int5-open-close.xsm
+load --int=6 ../stage27/int6-read.xsm
+load --int=7 ../stage27/int7-write.xsm
+load --int=8 ../stage27/int8-fork.xsm
+load --int=9 ../stage27/int9-exec.xsm
+load --int=10 ../stage27/int10-halt.xsm
+load --int=11 ../stage27/int11-wait-signal.xsm
+load --int=12 ../stage27/int12-logout.xsm
+load --int=13 ../stage27/int13-sem-get-rel.xsm
+load --int=14 ../stage27/int14-sem-lock-unlock.xsm
+load --int=15 ../stage27/int15-shutdown.xsm
+load --int=16 ../stage27/int16-uid-pass.xsm
+load --int=17 ../stage27/int17-login.xsm
+load --module 0 ../stage27/mod0-resource.xsm
+load --module 1 ../stage27/mod1-process.xsm
+load --module 2 ../stage27/mod2-memory.xsm
+load --module 3 ../stage27/mod3-file.xsm
+load --module 4 ../stage27/mod4-device.xsm
+load --module 5 ../stage27/mod5-scheduler.xsm
+load --module 6 ../stage27/mod6-pager.xsm
+load --module 7 ../stage27/mod7-boot.xsm
+load --os ../stage27/startup.xsm

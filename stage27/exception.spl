@@ -1,0 +1,73 @@
+// breakpoint;
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 9] = -1;
+
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1]* 16) + 11] * 512 - 1;
+
+backup;
+
+alias userSP R0;
+R0 = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1])*16 + 13];
+
+multipush (EIP);
+
+if (EC != 0 || userSP == PTLR*512 - 1) then
+    // breakpoint;
+    print "Exception";
+    print EC;
+    print EIP;
+    print [SYSTEM_STATUS_TABLE+1];
+    print "--------";
+
+    multipush (R0);
+    R1 = EXIT_PROCESS;
+    R2 = [SYSTEM_STATUS_TABLE + 1];
+    call PROCESS_MANAGER;
+    multipop  (R0);
+
+    multipush (R0);
+    call SCHEDULER;
+    multipop  (R0);
+endif;
+
+if (EPN >= 4 && EPN <= 7) then
+    alias blockNumber R2;
+    blockNumber = [DISK_MAP_TABLE + 10*[SYSTEM_STATUS_TABLE + 1] + EPN];
+
+    multipush (R0, R1, R2, EPN);
+    R1 = GET_CODE_PAGE;
+    R2 = blockNumber;
+    call MEMORY_MANAGER;
+    R15 = R0;
+    multipop  (R0, R1, R2, EPN);
+
+    [PTBR + EPN*2] = R15;
+    [PTBR + EPN*2 + 1] = "1100";
+endif;
+
+if (EPN == 2 || EPN == 3) then
+    multipush (R0);
+    R1 = GET_FREE_PAGE;
+    call MEMORY_MANAGER;
+
+    [PTBR + 4] = R0;
+    [PTBR + 5] = "1110";
+
+    R1 = GET_FREE_PAGE;
+    call MEMORY_MANAGER;
+    
+    [PTBR + 6] = R0;
+    [PTBR + 7] = "1110";
+    multipop  (R0);
+endif;
+
+multipop (EIP);
+
+restore;
+
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 9] = 0;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13] + 1;
+[[PTBR + 2*(SP/512)]*512 + SP%512] = EIP;
+
+// breakpoint;
+ireturn;

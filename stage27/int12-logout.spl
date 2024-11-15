@@ -1,0 +1,46 @@
+// breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 28;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+alias userSP R11;
+userSP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13];
+
+alias currentPCB R12;
+currentPCB = PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16;
+
+alias returnAddress R13;
+returnAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+
+if ([SYSTEM_STATUS_TABLE+1] != 2) then
+    [returnAddress] = -1;
+    [currentPCB + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+multipush (R11, R12, R13);
+R1 = KILL_ALL;
+R2 = [SYSTEM_STATUS_TABLE+1];
+// breakpoint;
+call PROCESS_MANAGER;
+multipop  (R11, R12, R13);
+
+[currentPCB + 4] = TERMINATED;
+
+alias stackMemoryPage R1;
+stackMemoryPage = [PTBR + 16];
+
+alias codeMemoryPage R2;
+codeMemoryPage = [PTBR + 8];
+
+[stackMemoryPage*512] = [codeMemoryPage*512 + 1];
+[currentPCB + 13] = 8*512;
+
+[PROCESS_TABLE + 1*16 + 4] = READY;
+[SYSTEM_STATUS_TABLE] = 0;
+
+call SCHEDULER;

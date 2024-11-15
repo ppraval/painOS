@@ -1,0 +1,25 @@
+int main(){
+
+	decl
+		str name;
+		int temp,perm;
+	enddecl
+	
+	
+	begin
+	
+
+		temp = exposcall("Read",-1,name);
+		temp = exposcall("Read",-1,perm);
+		temp = exposcall("Create",name,perm);
+		
+		if (temp == 0) then
+			temp = exposcall ("Write", -2, "created");
+		else 
+			temp = exposcall("Write", -2, "failed");
+		endif;
+		return 0;
+	
+	end
+
+}

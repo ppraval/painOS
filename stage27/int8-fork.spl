@@ -1,0 +1,161 @@
+// breakpoint;
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 9] = 8;
+
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 13] = SP;
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
+
+// instructionPointer+2, returnValue, Arguement3, Arguement2, Arguement1 ...
+
+alias userSP R0;
+R0 = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1]*16 + 13];
+
+alias currentPID R1;
+currentPID = [SYSTEM_STATUS_TABLE+1];
+
+alias childPID R2;
+multipush (R0, R1);
+R1 = GET_PCB_ENTRY;
+call PROCESS_MANAGER;
+childPID = R0;
+multipop  (R0, R1);
+
+if (childPID == -1) then
+    [[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1) % 512] = -1;
+    [PROCESS_TABLE + currentPID*16 + 9] = 0;
+    SP = userSP;
+
+    // breakpoint;
+    ireturn;
+endif;
+
+if ([PTBR + 4] == -1) then
+    multipush (R0, R1, R2);
+    R1 = GET_FREE_PAGE;
+    call MEMORY_MANAGER;
+    [PTBR + 4] = R0;
+    [PTBR + 5] = "0110";
+
+    R1 = GET_FREE_PAGE;
+    call MEMORY_MANAGER;
+    [PTBR + 6] = R0;
+    [PTBR + 7] = "0110";
+    multipop  (R0, R1, R2);
+endif;
+
+alias childPTBR R3;
+childPTBR = PAGE_TABLE_BASE + childPID*20;
+
+multipush (R0, R1, R2, R3);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+R15 = R0;
+multipop  (R0, R1, R2, R3);
+[childPTBR + 16] = R15;
+[childPTBR + 17] = "0110";
+
+multipush (R0, R1, R2, R3);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+R15 = R0;
+multipop  (R0, R1, R2, R3);
+[childPTBR + 18] = R15;
+[childPTBR + 19] = "0110";
+
+alias childPCB R4;
+childPCB = PROCESS_TABLE + childPID*16;
+
+multipush (R0, R1, R2, R3, R4);
+R1 = GET_FREE_PAGE;
+call MEMORY_MANAGER;
+R15 = R0;
+multipop  (R0, R1, R2, R3, R4);
+[childPCB + 11] = R15;
+
+alias pcb R6;
+pcb = PROCESS_TABLE + currentPID*16;
+
+[childPCB + 0] = 0;
+[childPCB + 1] = childPID;
+[childPCB + 2] = currentPID;
+[childPCB + 3] = [pcb + 3];
+[childPCB + 6] = 0;
+[childPCB + 7] = [pcb + 7];
+[childPCB + 9] = 0;
+[childPCB + 10] = [pcb + 10];
+[childPCB + 12] = 0;
+[childPCB + 13] = [pcb + 13];
+[childPCB + 14] = childPTBR;
+[childPCB + 15] = 10;
+
+
+[childPCB + 4] = CREATED;
+
+alias counter R5;
+counter = 0;
+while (counter < 10) do
+    [DISK_MAP_TABLE + childPID*10 + counter] = [DISK_MAP_TABLE + currentPID*10 + counter]; 
+    counter = counter + 1;
+endwhile;
+
+counter = 0;
+while (counter < 16) do
+    [childPTBR + counter] = [PTBR + counter];
+    counter = counter + 1;
+endwhile;
+
+counter = 4;
+while (counter < 16) do
+    if ([childPTBR + counter] != -1) then
+        [MEMORY_FREE_LIST + [childPTBR + counter]] = [MEMORY_FREE_LIST + [childPTBR + counter]] + 1;
+    endif;
+    counter = counter + 2;
+endwhile;
+
+counter = 0; 
+while (counter < 512) do
+    [[childPTBR+16]*512 + counter] = [[PTBR+16]*512 + counter];
+    [[childPTBR+18]*512 + counter] = [[PTBR+18]*512 + counter];
+    counter = counter + 1;
+endwhile;
+
+alias parentKernelStack R7;
+alias childKernelStack R8;
+alias tableIndex R9;
+parentKernelStack = [pcb + 11];
+childKernelStack = [childPCB + 11];
+
+counter = 0;
+while (counter < 8) do
+    [childKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter + 0] = [parentKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter + 0];
+    [childKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter + 1] = [parentKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter + 1];
+
+    tableIndex = [parentKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter + 1];
+    if ([parentKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter] == SEMAPHORE) then
+        [SEMAPHORE_TABLE + tableIndex*4 + 1] = [SEMAPHORE_TABLE + tableIndex*4 + 1] + 1;
+    endif;
+    if ([parentKernelStack*512 + RESOURCE_TABLE_OFFSET + 2*counter] == FILE) then
+        [OPEN_FILE_TABLE + tableIndex*4 + 1] = [OPEN_FILE_TABLE + tableIndex*4 + 1] + 1;
+        [FILE_STATUS_TABLE + [OPEN_FILE_TABLE + tableIndex*4]*4 + 1] = [FILE_STATUS_TABLE + [OPEN_FILE_TABLE + tableIndex*4]*4 + 1] + 1;
+        
+        // print "file forked";
+        // print [OPEN_FILE_TABLE + tableIndex*4];
+        // print childPID;
+        // print [SYSTEM_STATUS_TABLE+1];
+
+        // breakpoint;
+    endif;
+
+    counter = counter + 1;
+endwhile;
+
+[[childPCB + 11]*512] = BP;
+
+// setting up returnValue
+[[PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = childPID;
+[[childPTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512] = 0;
+
+[pcb + 9] = 0;
+SP = userSP;
+
+// breakpoint;
+ireturn;

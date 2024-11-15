@@ -1,0 +1,19 @@
+// breakpoint;
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+backup;
+
+[PROCESS_TABLE + [TERMINAL_STATUS_TABLE + 1]* 16 + 8] = P0;
+
+multipush (R0,R1,R2);
+R1 = RELEASE_TERMINAL;
+R2 = [TERMINAL_STATUS_TABLE + 1];
+call RESOURCE_MANAGER;
+multipop  (R0,R1,R2);
+
+restore;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+// breakpoint;
+ireturn;
